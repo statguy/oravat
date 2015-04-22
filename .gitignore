@@ -11,3 +11,8 @@
 # produced vignettes
 vignettes/*.html
 vignettes/*.pdf
+.Rproj.user
+
+# data files
+SquirrelData.csv
+SquirrelData_without_weather.csv
