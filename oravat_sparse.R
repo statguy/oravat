@@ -17,12 +17,12 @@ model <- DiscreteTimeContinuousSpaceModel$new()$
   constructMesh(coords=oravat[,c("X","Y")], cutoff=1e5, maxEdge=c(2e5, 10e5), convex=0.12)$ # sparse mesh
   plotMesh()$
   setSpatialPrior()$
-  setLikelihoodModel("nbinomial")
+  setLikelihood("nbinomial")
 model$getMesh()$n
 
 # Define model and estimate
 model$setCovariatesModel(~ 1 + interpolated_conevalue + naata1km + naataPrevYear + naata2YearsAgo + kernel_new + kernel_lagged + triangletype, covariates)$
-  addObservationStack(time=oravat$vuosi, response=oravat$scivultracks, covariates=covariates, offset=oravat$PITUUS)$
+  addObservationStack(coords=oravat[,c("X","Y")], time=oravat$vuosi, response=oravat$scivultracks, covariates=covariates, offset=oravat$PITUUS)$
   estimate(verbose=T)$
   summary()
 
@@ -38,7 +38,7 @@ model$setCovariatesModel(~ 1 + interpolated_conevalue + naata1km + naataPrevYear
 #Watanabe-Akaike information criterion (WAIC) ...: 39386.59
 
 model$setCovariatesModel(~ 1 + interpolated_conevalue + naata1km + naataPrevYear + kernel_new + kernel_lagged + triangletype, covariates)$
-  buildObservationStack()$
+  addObservationStack(coords=oravat[,c("X","Y")], time=oravat$vuosi, response=oravat$scivultracks, covariates=covariates, offset=oravat$PITUUS)$  
   estimate(verbose=T)$
   summary()
 
@@ -53,7 +53,7 @@ model$setCovariatesModel(~ 1 + interpolated_conevalue + naata1km + naataPrevYear
 #Watanabe-Akaike information criterion (WAIC) ...: 39384.69
 
 model$setCovariatesModel(~ 1 + interpolated_conevalue + naata1km + naataPrevYear + kernel_new + triangletype, covariates)$
-  buildObservationStack()$
+  addObservationStack(coords=oravat[,c("X","Y")], time=oravat$vuosi, response=oravat$scivultracks, covariates=covariates, offset=oravat$PITUUS)$
   estimate(verbose=T)$
   summary()
 
@@ -68,7 +68,7 @@ model$setCovariatesModel(~ 1 + interpolated_conevalue + naata1km + naataPrevYear
 
 # *** BEST MODEL (of all estimated models) ***
 model$setCovariatesModel(~ 1 + interpolated_conevalue + naata1km + kernel_new + triangletype, covariates)$
-  buildObservationStack()$
+  addObservationStack(coords=oravat[,c("X","Y")], time=oravat$vuosi, response=oravat$scivultracks, covariates=covariates, offset=oravat$PITUUS)$
   estimate(verbose=T)$
   summary()
 
@@ -81,7 +81,7 @@ model$setCovariatesModel(~ 1 + interpolated_conevalue + naata1km + kernel_new + 
 #Watanabe-Akaike information criterion (WAIC) ...: 39381.54
 
 model$setCovariatesModel(~ 1 + naata1km + kernel_new + triangletype, covariates)$
-  buildObservationStack()$
+  addObservationStack(coords=oravat[,c("X","Y")], time=oravat$vuosi, response=oravat$scivultracks, covariates=covariates, offset=oravat$PITUUS)$
   estimate(verbose=T)$
   summary()
 
