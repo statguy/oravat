@@ -63,6 +63,11 @@ model$setCovariatesModel(~ 1 + interpolated_conevalue + naata1km + triangletype,
 #Theta1 for spatial                                     1.5898     1.8952 1.5789
 #Theta2 for spatial                                     1.1734     1.4453 1.1654
 #GroupRho for spatial                                   0.9949     0.9974 0.9954
+#                 mean           sd   0.025quant     0.5quant   0.975quant
+#kappa    6.366364e-06 8.350001e-07 4.842739e-06 6.326020e-06 8.119188e-06
+#tau      9.148126e-03 6.098521e-04 8.008011e-03 9.125279e-03 1.040444e-02
+#range    4.519919e+05 5.996070e+04 3.480113e+05 4.467494e+05 5.834676e+05
+#variance 2.528168e+01 7.664776e+00 1.378995e+01 2.401125e+01 4.378527e+01
 
 model$setSmoothingModel()$
   addObservationStack(coords=oravat[,c("X","Y")], time=oravat$vuosi, response=oravat$scivultracks, covariates=covariates, offset=oravat$PITUUS)$
