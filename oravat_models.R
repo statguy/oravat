@@ -299,3 +299,69 @@ model$setCovariatesModel(~ interpolated_conevalue + marmar1km + triangletype, co
 # 
 # Marginal log-Likelihood:  -20696.74
 # Posterior marginals for linear predictor and fitted values computed
+
+# Null models
+
+model$clearStack()$setSmoothingModel()$
+  clearStack()$addObservationStack(time=oravat$Year, response=oravat$scivultracks, offset=oravat$Length)$
+  estimate(verbose=T)$summary()
+
+# Fixed effects:
+#   mean   sd 0.025quant 0.5quant 0.975quant    mode kld
+# intercept -1.3465 3.89    -9.1542  -1.3478     6.4674 -1.3495   0
+# 
+# Random effects:
+#   Name      Model
+# spatial   SPDE2 model
+# 
+# Model hyperparameters:
+#   mean     sd 0.025quant
+# size for the nbinomial observations (overdispersion) 0.8659 0.0201     0.8268
+# Theta1 for spatial                                   1.5719 0.1320     1.3220
+# Theta2 for spatial                                   1.3346 0.1154     1.1139
+# GroupRho for spatial                                 0.9934 0.0019     0.9891
+# 0.5quant 0.975quant   mode
+# size for the nbinomial observations (overdispersion)   0.8658     0.9059 0.8657
+# Theta1 for spatial                                     1.5680     1.8399 1.5560
+# Theta2 for spatial                                     1.3322     1.5667 1.3248
+# GroupRho for spatial                                   0.9935     0.9964 0.9939
+# 
+# Expected number of effective parameters(std dev): 525.69(29.03)
+# Number of equivalent replicates : 15.34
+# 
+# Watanabe-Akaike information criterion (WAIC) ...: 40804.08
+# Effective number of parameters .................: 533.97
+# 
+# Marginal log-Likelihood:  -20738.01
+# Posterior marginals for linear predictor and fitted values computed
+
+summary(inla(scivultracks ~ interpolated_conevalue + marmar1km + triangletype, data=oravat, family="nbinomial", control.compute=list(waic=TRUE)))
+
+# Fixed effects:
+# mean     sd 0.025quant 0.5quant 0.975quant    mode
+# (Intercept)             1.8926 0.0493     1.7968   1.8923     1.9904  1.8916
+# interpolated_conevalue  0.0054 0.0004     0.0047   0.0054     0.0062  0.0054
+# marmar1km               0.5371 0.0836     0.3755   0.5362     0.7036  0.5344
+# triangletypewlt        -0.4848 0.0509    -0.5857  -0.4845    -0.3857 -0.4838
+# kld
+# (Intercept)              0
+# interpolated_conevalue   0
+# marmar1km                0
+# triangletypewlt          0
+# 
+# The model has no random effects
+# 
+# Model hyperparameters:
+#   mean     sd 0.025quant
+# size for the nbinomial observations (overdispersion) 0.5334 0.0098     0.5144
+# 0.5quant 0.975quant   mode
+# size for the nbinomial observations (overdispersion)   0.5333      0.553 0.5332
+# 
+# Expected number of effective parameters(std dev): 4.065(9e-04)
+# Number of equivalent replicates : 1983.55 
+# 
+# Watanabe-Akaike information criterion (WAIC) ...: 43259.15
+# Effective number of parameters .................: 7.715
+# 
+# Marginal log-Likelihood:  -21654.49 
+# Posterior marginals for linear predictor and fitted values computed
