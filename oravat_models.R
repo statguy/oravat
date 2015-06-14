@@ -1,10 +1,11 @@
 if (F) {
   library(devtools)
-  install_github("statguy/SpaceTime")
-  reload(inst("SpaceTime"))
+  install_github("statguy/SpaceTimeModels")
+  reload(inst("SpaceTimeModels"))
 }
 
-library(SpaceTime)
+library(SpaceTimeModels)
+library(zoo)
 
 data <- read.csv2("SquirrelData_without_weather.csv", fileEncoding="latin1")
 columns <- c("Year","X","Y","Length","marmar1km","marmarPrevYear","marmar2YearsAgo","kernel_new","kernel_lagged","triangletype","interpolated_conevalue")
@@ -17,21 +18,24 @@ oravat$ycoord <- oravat$Y / 1e6
 # High correlation for kernel_lagged and kernel_new, leave out kernel_lagged
 cor(oravat[,!colnames(oravat) %in% c("Year","X","Y","Length","triangletype")])
 
+# Convert data to STIDF object
+oravat <- spacetime::STIDF(sp::SpatialPoints(oravat[,c("X","Y")]), zoo::as.yearmon(oravat$Year), oravat)
 
 # cutoff=5e3, maxEdge=c(3.7e4, 2e5), offset=c(1e4, 4e4), convex=0.04 # dense mesh
 # cutoff=1e5, maxEdge=c(2e5, 10e5), convex=0.12 # sparse mesh
-mesh <- NonConvexHullMesh$new(knots=oravat[,c("X","Y")], knotsScale=1e6)$construct(cutoff=1e4, maxEdge=c(5e4, 2e5), offset=c(1e4, 4e4), convex=0.05)
+mesh <- SpaceTimeModels::NonConvexHullMesh$new(knots=oravat@sp, knotsScale=1e6)$construct(cutoff=1e4, maxEdge=c(5e4, 2e5), offset=c(1e4, 4e4), convex=0.05)
 mesh$getINLAMesh()$n
 mesh$plot()
 
-model <- ContinuousSpaceDiscreteTimeModel$new()
+model <- SpaceTimeModels::ContinuousSpaceDiscreteTimeModel$new()
 model$setSpatialMesh(mesh)
 model$setSpatialPrior()
 model$setLikelihood("nbinomial")
 
-model$setCovariatesModel(~ interpolated_conevalue + marmar1km + marmarPrevYear + marmar2YearsAgo + kernel_new + triangletype + ycoord, covariates=oravat)
+model$setCovariatesModel(~ interpolated_conevalue + marmar1km + marmarPrevYear + marmar2YearsAgo + kernel_new + triangletype + ycoord, covariates=oravat@data)
 model$getLinearModel()
-model$addObservationStack(time=oravat$Year, response=oravat$scivultracks, covariates=oravat, offset=oravat$Length)
+#model$addObservationStack(time=oravat$Year, response=oravat$scivultracks, covariates=oravat, offset=oravat$Length)
+model$addObservationStack(stdf=oravat, response=oravat$scivultracks, covariates=oravat@data, offset=oravat$Length)
 model$estimate(verbose=T)
 model$summary()
 
@@ -81,8 +85,8 @@ model$summary()
 # Posterior marginals for linear predictor and fitted values computed
 
 
-model$setCovariatesModel(~ interpolated_conevalue + marmar1km + marmarPrevYear + marmar2YearsAgo + kernel_new + triangletype, covariates=oravat)$
-  clearStack()$addObservationStack(time=oravat$Year, response=oravat$scivultracks, covariates=oravat, offset=oravat$Length)$
+model$setCovariatesModel(~ interpolated_conevalue + marmar1km + marmarPrevYear + marmar2YearsAgo + kernel_new + triangletype, covariates=oravat@data)$
+  clearStack()$model$addObservationStack(stdf=oravat, response=oravat$scivultracks, covariates=oravat@data, offset=oravat$Length)$
   estimate(verbose=T)$summary()
 
 # Fixed effects:
@@ -129,7 +133,7 @@ model$setCovariatesModel(~ interpolated_conevalue + marmar1km + marmarPrevYear +
 # Posterior marginals for linear predictor and fitted values computed
 
 model$setCovariatesModel(~ interpolated_conevalue + marmar1km + marmar2YearsAgo + kernel_new + triangletype, covariates=oravat)$
-  clearStack()$addObservationStack(time=oravat$Year, response=oravat$scivultracks, covariates=oravat, offset=oravat$Length)$
+  clearStack()$model$addObservationStack(stdf=oravat, response=oravat$scivultracks, covariates=oravat@data, offset=oravat$Length)$
   estimate(verbose=T)$summary()
 
 # Fixed effects:
@@ -174,7 +178,7 @@ model$setCovariatesModel(~ interpolated_conevalue + marmar1km + marmar2YearsAgo 
 # Posterior marginals for linear predictor and fitted values computed
 
 model$setCovariatesModel(~ interpolated_conevalue + marmar1km + marmar2YearsAgo + triangletype, covariates=oravat)$
-  clearStack()$addObservationStack(time=oravat$Year, response=oravat$scivultracks, covariates=oravat, offset=oravat$Length)$
+  clearStack()$model$addObservationStack(stdf=oravat, response=oravat$scivultracks, covariates=oravat@data, offset=oravat$Length)$
   estimate(verbose=T)$summary()
 
 # Fixed effects:
@@ -217,7 +221,7 @@ model$setCovariatesModel(~ interpolated_conevalue + marmar1km + marmar2YearsAgo 
 # Posterior marginals for linear predictor and fitted values computed
 
 model$setCovariatesModel(~ interpolated_conevalue + marmar1km + marmarPrevYear + triangletype, covariates=oravat)$
-  clearStack()$addObservationStack(time=oravat$Year, response=oravat$scivultracks, covariates=oravat, offset=oravat$Length)$
+  clearStack()$model$addObservationStack(stdf=oravat, response=oravat$scivultracks, covariates=oravat@data, offset=oravat$Length)$
   estimate(verbose=T)$summary()
 
 # Fixed effects:
@@ -260,7 +264,7 @@ model$setCovariatesModel(~ interpolated_conevalue + marmar1km + marmarPrevYear +
 # Posterior marginals for linear predictor and fitted values computed
 
 model$setCovariatesModel(~ interpolated_conevalue + marmar1km + triangletype, covariates=oravat)$
-  clearStack()$addObservationStack(time=oravat$Year, response=oravat$scivultracks, covariates=oravat, offset=oravat$Length)$
+  clearStack()$model$addObservationStack(stdf=oravat, response=oravat$scivultracks, covariates=oravat@data, offset=oravat$Length)$
   estimate(verbose=T)$summary()
 
 # Fixed effects:
@@ -303,7 +307,7 @@ model$setCovariatesModel(~ interpolated_conevalue + marmar1km + triangletype, co
 # Null models
 
 model$clearStack()$setSmoothingModel()$
-  clearStack()$addObservationStack(time=oravat$Year, response=oravat$scivultracks, offset=oravat$Length)$
+  clearStack()$addObservationStack(stdf=oravat, response=oravat$scivultracks, offset=oravat$Length)$
   estimate(verbose=T)$summary()
 
 # Fixed effects:
@@ -335,7 +339,7 @@ model$clearStack()$setSmoothingModel()$
 # Marginal log-Likelihood:  -20738.01
 # Posterior marginals for linear predictor and fitted values computed
 
-summary(inla(scivultracks ~ interpolated_conevalue + marmar1km + triangletype, data=oravat, family="nbinomial", control.compute=list(waic=TRUE)))
+summary(inla(scivultracks ~ interpolated_conevalue + marmar1km + triangletype, data=oravat@data, family="nbinomial", control.compute=list(waic=TRUE)))
 
 # Fixed effects:
 # mean     sd 0.025quant 0.5quant 0.975quant    mode
