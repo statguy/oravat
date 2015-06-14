@@ -86,7 +86,7 @@ model$summary()
 
 
 model$setCovariatesModel(~ interpolated_conevalue + marmar1km + marmarPrevYear + marmar2YearsAgo + kernel_new + triangletype, covariates=oravat@data)$
-  clearStack()$model$addObservationStack(stdf=oravat, response=oravat$scivultracks, covariates=oravat@data, offset=oravat$Length)$
+  clearStack()$addObservationStack(stdf=oravat, response=oravat$scivultracks, covariates=oravat@data, offset=oravat$Length)$
   estimate(verbose=T)$summary()
 
 # Fixed effects:
@@ -133,7 +133,7 @@ model$setCovariatesModel(~ interpolated_conevalue + marmar1km + marmarPrevYear +
 # Posterior marginals for linear predictor and fitted values computed
 
 model$setCovariatesModel(~ interpolated_conevalue + marmar1km + marmar2YearsAgo + kernel_new + triangletype, covariates=oravat)$
-  clearStack()$model$addObservationStack(stdf=oravat, response=oravat$scivultracks, covariates=oravat@data, offset=oravat$Length)$
+  clearStack()$addObservationStack(stdf=oravat, response=oravat$scivultracks, covariates=oravat@data, offset=oravat$Length)$
   estimate(verbose=T)$summary()
 
 # Fixed effects:
@@ -177,8 +177,8 @@ model$setCovariatesModel(~ interpolated_conevalue + marmar1km + marmar2YearsAgo 
 # Marginal log-Likelihood:  -20706.54 
 # Posterior marginals for linear predictor and fitted values computed
 
-model$setCovariatesModel(~ interpolated_conevalue + marmar1km + marmar2YearsAgo + triangletype, covariates=oravat)$
-  clearStack()$model$addObservationStack(stdf=oravat, response=oravat$scivultracks, covariates=oravat@data, offset=oravat$Length)$
+model$setCovariatesModel(~ interpolated_conevalue + marmar1km + marmar2YearsAgo + triangletype, covariates=oravat@data)$
+  clearStack()$addObservationStack(stdf=oravat, response=oravat$scivultracks, covariates=oravat@data, offset=oravat$Length)$
   estimate(verbose=T)$summary()
 
 # Fixed effects:
@@ -220,8 +220,8 @@ model$setCovariatesModel(~ interpolated_conevalue + marmar1km + marmar2YearsAgo 
 # Marginal log-Likelihood:  -20700.60 
 # Posterior marginals for linear predictor and fitted values computed
 
-model$setCovariatesModel(~ interpolated_conevalue + marmar1km + marmarPrevYear + triangletype, covariates=oravat)$
-  clearStack()$model$addObservationStack(stdf=oravat, response=oravat$scivultracks, covariates=oravat@data, offset=oravat$Length)$
+model$setCovariatesModel(~ interpolated_conevalue + marmar1km + marmarPrevYear + triangletype, covariates=oravat@data)$
+  clearStack()$addObservationStack(stdf=oravat, response=oravat$scivultracks, covariates=oravat@data, offset=oravat$Length)$
   estimate(verbose=T)$summary()
 
 # Fixed effects:
@@ -263,8 +263,8 @@ model$setCovariatesModel(~ interpolated_conevalue + marmar1km + marmarPrevYear +
 # Marginal log-Likelihood:  -20701.35
 # Posterior marginals for linear predictor and fitted values computed
 
-model$setCovariatesModel(~ interpolated_conevalue + marmar1km + triangletype, covariates=oravat)$
-  clearStack()$model$addObservationStack(stdf=oravat, response=oravat$scivultracks, covariates=oravat@data, offset=oravat$Length)$
+model$setCovariatesModel(~ interpolated_conevalue + marmar1km + triangletype, covariates=oravat@data)$
+  clearStack()$addObservationStack(stdf=oravat, response=oravat$scivultracks, covariates=oravat@data, offset=oravat$Length)$
   estimate(verbose=T)$summary()
 
 # Fixed effects:
