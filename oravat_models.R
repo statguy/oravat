@@ -23,7 +23,7 @@ oravat <- spacetime::STIDF(sp::SpatialPoints(oravat[,c("X","Y")]), zoo::as.yearm
 
 # cutoff=5e3, maxEdge=c(3.7e4, 2e5), offset=c(1e4, 4e4), convex=0.04 # dense mesh
 # cutoff=1e5, maxEdge=c(2e5, 10e5), convex=0.12 # sparse mesh
-mesh <- SpaceTimeModels::NonConvexHullMesh$new(knots=oravat@sp, knotsScale=1e6)$construct(cutoff=1e4, maxEdge=c(5e4, 2e5), offset=c(1e4, 4e4), convex=0.05)
+mesh <- SpaceTimeModels::NonConvexHullMesh$new(knots=oravat@sp, knotsScale=1e6, cutoff=1e4, maxEdge=c(5e4, 2e5), offset=c(1e4, 4e4), convex=0.05)
 mesh$getINLAMesh()$n
 mesh$plot()
 
@@ -219,6 +219,8 @@ model$setCovariatesModel(~ interpolated_conevalue + marmar1km + marmar2YearsAgo 
 # 
 # Marginal log-Likelihood:  -20700.60 
 # Posterior marginals for linear predictor and fitted values computed
+
+# !!
 
 model$setCovariatesModel(~ interpolated_conevalue + marmar1km + marmarPrevYear + triangletype, covariates=oravat@data)$
   clearStack()$addObservationStack(stdf=oravat, response=oravat$scivultracks, covariates=oravat@data, offset=oravat$Length)$
