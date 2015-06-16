@@ -35,7 +35,7 @@ model$setLikelihood("nbinomial")
 model$setCovariatesModel(~ interpolated_conevalue + marmar1km + marmarPrevYear + marmar2YearsAgo + kernel_new + triangletype + ycoord, covariates=oravat@data)
 model$getLinearModel()
 #model$addObservationStack(time=oravat$Year, response=oravat$scivultracks, covariates=oravat, offset=oravat$Length)
-model$addObservationStack(stdf=oravat, response=oravat$scivultracks, covariates=oravat@data, offset=oravat$Length)
+model$addObservationStack(sp=oravat, response=oravat$scivultracks, covariates=oravat@data, offset=oravat$Length)
 model$estimate(verbose=T)
 model$summary()
 
@@ -86,7 +86,7 @@ model$summary()
 
 
 model$setCovariatesModel(~ interpolated_conevalue + marmar1km + marmarPrevYear + marmar2YearsAgo + kernel_new + triangletype, covariates=oravat@data)$
-  clearStack()$addObservationStack(stdf=oravat, response=oravat$scivultracks, covariates=oravat@data, offset=oravat$Length)$
+  clearStack()$addObservationStack(sp=oravat, response=oravat$scivultracks, covariates=oravat@data, offset=oravat$Length)$
   estimate(verbose=T)$summary()
 
 # Fixed effects:
@@ -133,7 +133,7 @@ model$setCovariatesModel(~ interpolated_conevalue + marmar1km + marmarPrevYear +
 # Posterior marginals for linear predictor and fitted values computed
 
 model$setCovariatesModel(~ interpolated_conevalue + marmar1km + marmar2YearsAgo + kernel_new + triangletype, covariates=oravat)$
-  clearStack()$addObservationStack(stdf=oravat, response=oravat$scivultracks, covariates=oravat@data, offset=oravat$Length)$
+  clearStack()$addObservationStack(sp=oravat, response=oravat$scivultracks, covariates=oravat@data, offset=oravat$Length)$
   estimate(verbose=T)$summary()
 
 # Fixed effects:
@@ -178,7 +178,7 @@ model$setCovariatesModel(~ interpolated_conevalue + marmar1km + marmar2YearsAgo 
 # Posterior marginals for linear predictor and fitted values computed
 
 model$setCovariatesModel(~ interpolated_conevalue + marmar1km + marmar2YearsAgo + triangletype, covariates=oravat@data)$
-  clearStack()$addObservationStack(stdf=oravat, response=oravat$scivultracks, covariates=oravat@data, offset=oravat$Length)$
+  clearStack()$addObservationStack(sp=oravat, response=oravat$scivultracks, covariates=oravat@data, offset=oravat$Length)$
   estimate(verbose=T)$summary()
 
 # Fixed effects:
@@ -223,7 +223,7 @@ model$setCovariatesModel(~ interpolated_conevalue + marmar1km + marmar2YearsAgo 
 # !!
 
 model$setCovariatesModel(~ interpolated_conevalue + marmar1km + marmarPrevYear + triangletype, covariates=oravat@data)$
-  clearStack()$addObservationStack(stdf=oravat, response=oravat$scivultracks, covariates=oravat@data, offset=oravat$Length)$
+  clearStack()$addObservationStack(sp=oravat, response=oravat$scivultracks, covariates=oravat@data, offset=oravat$Length)$
   estimate(verbose=T)$summary()
 
 # Fixed effects:
@@ -266,7 +266,7 @@ model$setCovariatesModel(~ interpolated_conevalue + marmar1km + marmarPrevYear +
 # Posterior marginals for linear predictor and fitted values computed
 
 model$setCovariatesModel(~ interpolated_conevalue + marmar1km + triangletype, covariates=oravat@data)$
-  clearStack()$addObservationStack(stdf=oravat, response=oravat$scivultracks, covariates=oravat@data, offset=oravat$Length)$
+  clearStack()$addObservationStack(sp=oravat, response=oravat$scivultracks, covariates=oravat@data, offset=oravat$Length)$
   estimate(verbose=T)$summary()
 
 # Fixed effects:
@@ -309,7 +309,7 @@ model$setCovariatesModel(~ interpolated_conevalue + marmar1km + triangletype, co
 # Null models
 
 model$clearStack()$setSmoothingModel()$
-  clearStack()$addObservationStack(stdf=oravat, response=oravat$scivultracks, offset=oravat$Length)$
+  clearStack()$addObservationStack(sp=oravat, response=oravat$scivultracks, offset=oravat$Length)$
   estimate(verbose=T)$summary()
 
 # Fixed effects:
