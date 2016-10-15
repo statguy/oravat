@@ -6,20 +6,22 @@ if (F) {
 
 library(SpaceTimeModels)
 library(zoo)
+library(splancs)
 
 data <- read.csv2("SquirrelData_without_weather.csv", fileEncoding="latin1")
 columns <- c("Year","X","Y","Length","marmar1km","marmarPrevYear","marmar2YearsAgo","kernel_new","kernel_lagged","triangletype","interpolated_conevalue")
 completeIndex <- complete.cases(data[,columns])
-oravat <- data[completeIndex, c("scivultracks", columns)]
+oravat.raw <- data[completeIndex, c("scivultracks", columns)]
 #scaleColumns <- !colnames(oravat) %in% c("Year","X","Y","Length","triangletype")
 #scaleColumns <- scale(oravat[,scaleColumns])
-oravat$ycoord <- oravat$Y / 1e6
+oravat.raw$ycoord <- oravat.raw$Y / 1e6
 
 # High correlation for kernel_lagged and kernel_new, leave out kernel_lagged
-cor(oravat[,!colnames(oravat) %in% c("Year","X","Y","Length","triangletype")])
+cor(oravat.raw[,!colnames(oravat.raw) %in% c("Year","X","Y","Length","triangletype")])
 
+#oravat.raw <- oravat.raw[sample(1:nrow(oravat.raw), 250),] # Take sample for testing only
 # Convert data to STIDF object
-oravat <- spacetime::STIDF(sp::SpatialPoints(oravat[,c("X","Y")]), zoo::as.yearmon(oravat$Year), oravat)
+oravat <- spacetime::STIDF(sp::SpatialPoints(oravat.raw[,c("X","Y")]), zoo::as.yearmon(oravat.raw$Year), oravat.raw)
 
 # cutoff=5e3, maxEdge=c(3.7e4, 2e5), offset=c(1e4, 4e4), convex=0.04 # dense mesh
 # cutoff=1e5, maxEdge=c(2e5, 10e5), convex=0.12 # sparse mesh
@@ -38,6 +40,22 @@ model$getLinearModel()
 model$addObservationStack(sp=oravat, response=oravat$scivultracks, covariates=oravat@data, offset=oravat$Length)
 model$estimate(verbose=T)
 model$summary()
+
+
+offset <- oravat$Length
+tag <- "obs"
+index <- inla.stack.index(model$getFullStack(), tag)$data
+nodes <- model$getSpatialMesh()$getINLAMesh()$n
+spatial.mean <- inla.vector2matrix(model$getResult()$summary.random$spatial$mean, nrow = nodes, ncol = length(unique(time(oravat))))
+spatial.sd <- inla.vector2matrix(model$getResult()$summary.random$spatial$sd, nrow = nodes, ncol = length(unique(time(oravat))))
+
+projector <- inla.mesh.projector(model$getSpatialMesh()$getINLAMesh())
+year.index <- 1
+projection.mean <- inla.mesh.project(projector, spatial.mean[,year.index])
+projection.sd <- inla.mesh.project(projector, spatial.sd[,year.index])
+image(projector$x, projector$y, projection.mean)
+image(projector$x, projector$y, projection.sd)
+
 
 # Fixed effects:
 #   mean      sd 0.025quant 0.5quant 0.975quant    mode
@@ -83,6 +101,8 @@ model$summary()
 # 
 # Marginal log-Likelihood:  -20730.26 
 # Posterior marginals for linear predictor and fitted values computed
+
+model$summaryTemporalVariation()
 
 
 model$setCovariatesModel(~ interpolated_conevalue + marmar1km + marmarPrevYear + marmar2YearsAgo + kernel_new + triangletype, covariates=oravat@data)$
