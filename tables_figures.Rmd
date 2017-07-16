@@ -1,0 +1,345 @@
+---
+output:
+  word_document:
+    keep_md: true
+---
+
+```{r, cache=FALSE, include=FALSE}
+library(knitr)
+library(pander)
+knitr::opts_chunk$set(echo = FALSE, include = FALSE, warning = FALSE, message = FALSE)
+```
+
+```{r, cache=TRUE}
+library(rgeos)
+library(SpaceTimeModels)
+library(dplyr)
+library(zoo)
+library(splancs)
+library(rgdal)
+library(raster)
+library(scales)
+library(gstat)
+source("utils.R")
+```
+
+```{r, cache=TRUE}
+data <- read.csv2("SquirrelData_without_weather.csv", fileEncoding="latin1")
+finland <- getData(country = "FI", level = 0) %>% spTransform(CRS("+init=epsg:2393")) %>% gSimplify(2000)
+finland.tidy <- broom::tidy(finland)
+finland1 <- getData(country = "FI", level = 1) %>% spTransform(CRS("+init=epsg:2393"))
+finland1.tidy <- broom::tidy(finland1)
+
+complete.columns <- c("id","Year","X","Y","Length","marmar1km","marmarPrevYear","marmar2YearsAgo","kernel_new","kernel_lagged","triangletype","interpolated_conevalue")
+oravat.raw <- data %>%
+  dplyr::mutate(id.tmp = paste0(X, Y), id = factor(as.numeric(factor(id.tmp)))) %>% dplyr::select(-id.tmp) %>%
+  dplyr::select(one_of(c(complete.columns, "scivultracks"))) %>%
+  dplyr::filter(complete.cases(.[complete.columns])) %>%
+  dplyr::mutate(xcoord = X, ycoord = Y) %>%
+  dplyr::mutate(density = scivultracks / Length * 10) %>%
+  dplyr::mutate(yearmodel = Year - min(Year))
+oravat.sp <- oravat.raw
+coordinates(oravat.sp) <- ~ X + Y
+proj4string(oravat.sp) <- finland1@proj4string
+oravat.raw$Province <- factor(oravat.sp %over% polygons(finland1), labels = finland1$NAME_1)
+xscale <- function(x) arm::rescale(x)
+oravat.scaled <- oravat.raw %>%
+  dplyr::mutate_each(funs(xscale), marmar1km, marmarPrevYear, marmar2YearsAgo, kernel_new, kernel_lagged, interpolated_conevalue, triangletype, xcoord, ycoord, yearmodel)
+
+coord.scale <- 1e-6
+oravat.filtered <- oravat.scaled %>%
+  dplyr::group_by(Province) %>% 
+  dplyr::mutate(q95 = density > quantile(density, .95)) %>%
+  dplyr::filter(q95 == FALSE) %>% 
+  dplyr::select(-q95) %>%
+  dplyr::ungroup() %>%
+  dplyr::mutate(xs = X * coord.scale, ys = Y * coord.scale)
+
+oravat <- spacetime::STIDF(sp::SpatialPoints(oravat.filtered[,c("X","Y")]), zoo::as.yearmon(oravat.filtered$Year), oravat.filtered)
+```
+
+```{r census-sites, include=TRUE, cache=TRUE, fig.width=6.535433, fig.asp=1, fig.cap="Figure 1: Census sites and provinces of Finland."}
+labels <- data.frame(coordinates(finland1), label = finland1$NAME_1)
+p <- oravat.raw %>% mutate(`Census site type` = factor(triangletype, labels = c("Field", "Forest"))) %>% 
+  distinct(X, Y, `Census site type`) %>% ggplot() +
+  geom_path(data = finland1.tidy, aes(long, lat, group = group), colour = "grey") +
+  geom_point(aes(X, Y, colour = `Census site type`), size = .5, alpha = .5) +
+  coord_equal() + theme_blank() + xlab(NULL) + ylab(NULL) +
+  theme(legend.position = c(0.1, .6), legend.margin = unit(-1, units = "line")) +
+  scale_x_continuous(expand = c(0.01, 0.01)) +
+  scale_y_continuous(expand = c(0.01, 0.01)) +
+  geom_label(data = labels, aes(X1, X2, label = label))
+print(p)
+#p %>% save_single_column_figure("figures/census-sites.pdf", height = 14, dpi = 300)
+#p %>% save_single_column_figure("figures/census-sites.png", height = 14, dpi = 300)
+```
+
+&nbsp;
+
+```{r, eval=FALSE}
+oravat.filtered %>% dplyr::select(Year, density) %>% lm(density ~ Year, data = .) %>% summary
+oravat.filtered %>% dplyr::select(Year, marmar1km) %>% lm(marmar1km ~ Year, data = .) %>% summary
+oravat.filtered %>% dplyr::select(Year, kernel_new) %>% lm(kernel_new ~ Year, data = .) %>% summary
+oravat.filtered %>% dplyr::select(Year, interpolated_conevalue) %>% lm(interpolated_conevalue ~ Year, data = .) %>% summary
+```
+
+```{r density, cache=TRUE, include=TRUE, fig.width=6.535433, fig.asp=1, fig.cap="Figure 2: Mean, 95% quantiles (error bar) and linear trend (blue line) of the observed densities of the study species in Finland over the study period. The unit for red squirrel and pine marten is counts/1 km."}
+oravat.raw %>% dplyr::select(Year, density, marmar1km, kernel_new, interpolated_conevalue) %>%
+  rename(`Red squirrel`=density, `Pine marten`=marmar1km, `Northern goshawk`=kernel_new, `Spruce cone`=interpolated_conevalue) %>%
+  gather(Species, Density, `Red squirrel`, `Pine marten`, `Northern goshawk`, `Spruce cone`, -Year) %>% group_by(Year, Species) %>% 
+  summarise(ymin = quantile(Density, 0.025), ymax = quantile(Density, 0.975),
+            Density = mean(Density)) %>%
+  ggplot(aes(Year, Density)) + facet_wrap(~Species, scales = "free") + 
+  geom_path() + geom_errorbar(aes(ymin=ymin, ymax=ymax)) + geom_smooth(method='lm', formula=y~x, se = F)
+```
+
+&nbsp;
+
+```{r density-by-province, cache=TRUE, include=TRUE, fig.width=6.535433, fig.asp=1, fig.cap="Figure 3: Mean and linear trend (blue line) of the observed number of snow tracks of red squirrels (counts/1 km) in provinces of Finland (see Fig. 1) each year. The data has been filtered to remove unusually high counts."}
+#x <- oravat.filtered %>% dplyr::group_by(Year) %>%
+#  dplyr::mutate(density = density) %>%
+#  #dplyr::summarise(Province = "Finland", Mean = mean(density), Median = median(density), `Q 2.5%` = quantile(density, 0.025), `Q 97.5%` = #quantile(density, 0.975)) %>%
+#  dplyr::summarise(Province = "Finland", Mean = mean(density)) %>%
+#  gather(Aggregation, Value, -Year, -Province)
+oravat.filtered %>% dplyr::group_by(Year, Province) %>%
+  dplyr::mutate(density = density) %>%
+  #dplyr::summarise(Mean = mean(density), Median = median(density), `Q 2.5%` = quantile(density, 0.025), `Q 97.5%` = quantile(density, 0.975)) %>%
+  dplyr::summarise(Mean = mean(density)) %>%
+  gather(Aggregation, Value, -Year, -Province) %>%
+#  bind_rows(x) %>%
+  # ggplot(aes(Year, Value, colour = Aggregation)) + geom_path() + facet_wrap(~ Province, ncol = 2, scales="free") +
+  ggplot(aes(Year, Value)) + geom_path() + facet_wrap(~ Province, ncol = 2) + #, scales="free") +
+  ylab(expression(Count / km)) + #theme_chart()
+  #geom_smooth(se = F) + 
+  geom_smooth(method='lm', formula=y~x, se = F) +
+  guides(colour = guide_legend(title = NULL))
+```
+
+```{r cor-by-province, include=TRUE, cache=TRUE, eval=FALSE}
+provincial_correlations <- function(data, finland1, varname) {
+  x <- coordinates(finland1) %>% dist() %>% as.matrix() %>%
+    `row.names<-`(finland1$NAME_1) %>% `colnames<-`(finland1$NAME_1)
+  distances <- x %>% reshape2::melt(varnames = c("Province1", "Province2"), value.name = "Distance", na.rm = T)
+
+  southern <- data %>% dplyr::filter(Province %in% "Southern Finland") %>% .[,varname]
+  western <- data %>% dplyr::filter(Province %in% "Western Finland") %>% .[,varname]
+  eastern <- data %>% dplyr::filter(Province %in% "Eastern Finland") %>% .[,varname]
+  oulu <- data %>% dplyr::filter(Province %in% "Oulu") %>% .[,varname]
+  lapland <- data %>% dplyr::filter(Province %in% "Lapland") %>% .[,varname]
+  correlations <- data.frame(Province1 = c(rep("Southern Finland", 4), rep("Western Finland", 3), rep("Eastern Finland", 2), "Oulu"),
+             Province2 = c("Western Finland", "Eastern Finland", "Oulu", "Lapland", "Eastern Finland", "Oulu", "Lapland", "Oulu", "Lapland", "Lapland"), 
+             Correlation = c(cor(southern, western), cor(southern, eastern) ,cor(southern, oulu), cor(southern, lapland),
+                             cor(western, eastern), cor(western, oulu), cor(western, lapland), cor(eastern, oulu),
+                             cor(eastern, lapland), cor(oulu, lapland)))
+  correlations %>% dplyr::left_join(distances, by = c("Province1", "Province2"))
+}
+
+x <- oravat.filtered %>% dplyr::group_by(Province, Year) %>% 
+  dplyr::summarise(density = mean(density), cone = mean(interpolated_conevalue), marmar = mean(marmar1km), goshawk = mean(kernel_new))
+
+#provincial_correlations(x, finland1, "density") %>%
+#provincial_correlations(x, finland1, "cone") %>%
+#provincial_correlations(x, finland1, "marmar") %>%
+#provincial_correlations(x, finland1, "goshawk") %>%
+provincial_correlations(x, finland1, "density") %>%
+  dplyr::arrange(-Correlation) %>% 
+  mutate(Correlation = round(Correlation, 2), Distance = round(Distance / 1e3)) %>%
+  `colnames<-`(c("Province", "Province", "Correlation", "Distance (km)")) %>%
+  pander(caption = "Table 1: Correlations of red squirrel snow track counts pooled over years between each province of Finland.")
+```
+
+&nbsp;
+
+```{r variograms, cache=TRUE, include=TRUE, fig.width=6.535433, fig.asp=1, fig.cap="Figure 4: Variograms pooled over the years for the densities of the study species up to 1000 km. Smooth trend is indicated with blue. Variogram estimates are accompanied with number of samples in each distance bin: bigger value indicates more reliable result."}
+oravat.filtered.sp <- oravat.filtered %>% 
+#  filter(triangletype > 0) %>%
+  dplyr::select(X, Y, Year, density, kernel_new, marmar1km, interpolated_conevalue, triangletype) %>%
+  na.omit() %>% `coordinates<-`(~ X + Y)
+oravat.full.sp <- oravat.raw %>%
+#  filter(triangletype == "wlt") %>%
+  dplyr::select(X, Y, Year, density, kernel_new, marmar1km, interpolated_conevalue, triangletype) %>% 
+  na.omit() %>% `coordinates<-`(~ X + Y)
+v1 <- variogram(density ~ Year, oravat.filtered.sp, cutoff = 1000e3, dX = 0) %>% mutate(Variable = "Red squirrel")
+v2 <- variogram(kernel_new ~ Year, oravat.full.sp, cutoff = 1000e3, dX = 0) %>% mutate(Variable = "Northern goshawk")
+v3 <- variogram(marmar1km ~ Year, oravat.full.sp, cutoff = 1000e3, dX = 0) %>% mutate(Variable = "Pine marten")
+v4 <- variogram(interpolated_conevalue ~ Year, oravat.full.sp, cutoff = 1000e3, dX = 0) %>% mutate(Variable = "Spruce cone")
+#v5 <- variogram(triangletype ~ Year, oravat.full.sp, cutoff = 1000e3, dX = 0) %>% mutate(Variable = "Survey transect type")
+
+v <- v1 %>% bind_rows(v2, v3, v4) %>% mutate(dist = dist / 1e3)
+v %>% ggplot(aes(dist, gamma)) + geom_smooth(se = F) +
+  geom_point() + 
+  geom_text(aes(label = np), check_overlap = TRUE, vjust = -.7) +
+  facet_wrap(~ Variable, scales = "free_y") +
+  scale_x_continuous(expand = c(.15, .15)) + #scale_y_continuous(expand = c(.1, .1)) +
+  xlab("Distance (km)") + ylab("Semivariance")
+```
+
+&nbsp;
+
+```{r explanators-time-series, cache=TRUE, include=TRUE, eval=FALSE, fig.width=6.535433, fig.height=3.267717, fig.cap="Figure 5: Annual and variation in the explaining variables with smooth trends in blue."}
+x <- oravat.raw %>%
+  #dplyr::group_by(Year, Province) %>%
+  dplyr::group_by(Year) %>%
+  dplyr::summarise(#`Red squirrel` = mean(density),
+                   `Spruce cone` = mean(interpolated_conevalue), 
+                   `Pine marten` = mean(marmar1km),
+                   #`Pine marten lag` = mean(marmarPrevYear),
+                   #`Pine marten 2 lags` = mean(marmar2YearsAgo),
+                   `Northern goshawk` = mean(kernel_new)) %>%
+                   #`Northern goshawk lag` = mean(kernel_lagged)) %>%
+  #dplyr::group_by(Province) %>%
+  #dplyr::mutate_each(funs(scale), -Year) %>%
+  #tidyr::gather(Variable, Value, -Year, -Province, factor_key = T) %>%
+  tidyr::gather(Variable, Value, -Year, factor_key = T) %>%
+  dplyr::ungroup()
+#x %>% ggplot(aes(Year, Value)) + geom_path() + geom_smooth(se = F) + facet_wrap(Province ~ Variable, ncol = 3)
+x %>% ggplot(aes(Year, Value)) + geom_path() + geom_smooth(se = F) + facet_wrap( ~ Variable, ncol = 3, scales = "free_y")
+```
+
+&nbsp;
+
+
+```{r variable-correlations, cache=TRUE, include=TRUE}
+cor_all <- function(data) {
+  #x <- data %>% spread(Variable, Value) %>% dplyr::select(-Year, -Province) %>% cor() 
+  x <- data %>% spread(Variable, Value) %>% dplyr::select(-Year, -Province, -id) %>% cor() 
+  x[lower.tri(x, diag = T)] <- NA
+  x %>% as.data.frame() %>% rownames_to_column("Variable1") %>% 
+    gather(Variable2, Correlation, -Variable1) %>% na.omit() %>%
+    filter(Variable1 != Variable2)
+}
+
+x <- oravat.filtered %>% 
+  dplyr::select(Province, Year, id, density, interpolated_conevalue, marmar1km, marmarPrevYear, marmar2YearsAgo, kernel_new, ycoord, yearmodel) %>%
+  rename(`Red squirrel`=density, `Pine marten`=marmar1km, `Pine marten 1 year lag`=marmarPrevYear, `Spruce cone`=interpolated_conevalue,
+         `Pine marten 2 years lag`=marmar2YearsAgo, `Northern goshawk`=kernel_new, `Y-coordinate`=ycoord, `Year `=yearmodel) %>%
+  dplyr::group_by(Province) %>% tidyr::gather(Variable, Value, -Province, -Year, -id, factor_key = T) %>%
+  dplyr::ungroup()
+x %>% cor_all() %>% arrange(-Correlation) %>%
+  mutate(Correlation = round(Correlation, 2)) %>% mutate(Correlation = format(Correlation)) %>%
+  `colnames<-`(c("Variable", "Variable", "Correlation")) %>%
+  pander(caption = "Table 1: Correlations between study variables arranged from positive high to negative low.")
+```
+
+&nbsp;
+
+```{r, cache=TRUE}
+load(file="model1-4.RData")
+```
+
+*Table 2: Best fit model, alternative set of covariates models and baseline models. Ranking is by Watanabe-Akaike information criteria (WAIC) where lower score indicates better fit.*
+
+Model|WAIC
+:-:|:-:
+Independent best fit with covariates|37134.89
+Spatio-temporal no covariates|35599.88
+Spatio-temporal all covariates|35539.63
+Spatio-temporal best fit|35535.08
+Spatio-temporal best fit without Y-coordinate|35535.89
+Spatio-temporal best fit without Y-coordinate with goshawk|35538.65
+<!--Spatial replicate best fit|36508.20
+Spatio-temporal RW best fit|39643.33-->
+
+&nbsp;
+
+```{r fixed-effect-estimates, cache=TRUE, include=TRUE}
+model1$summary()$fixed %>% as.data.frame() %>% 
+  dplyr::select(mean, sd, ends_with("quant"), mode) %>% 
+  round(2) %>% format() %>%
+  `colnames<-`(c("Mean", "SD", "2.5% Q.", "Median", "97.5% Q.", "Mode")) %>%
+  `rownames<-`(c("Intercept", "Pine marten", "Pine marten 1 year lag", "Spruce cone", "Triangle type (forest)", "Y-coordinate")) %>%
+  pander(caption = "Table 3: Estimated weights of the effects on red squirrel census density in the best fit model. The weights
+         are relative to each other in strength.")
+```
+
+&nbsp;
+
+```{r, observed-fitted-counts-site-level, cache=TRUE, include=TRUE, eval=FALSE, fig.width=6.535433, fig.height=3.267717, fig.cap="Figure 5: Observed and fitted survey counts of red squirrel at randomly selected census sites."}
+fitted <- model1$getResult()$summary.fitted.values[model1$getIndex("obs"),]
+compare <- data.frame(Id = oravat@data$id, Year = time(oravat), Observed.mean = oravat$density, Observed.sd = NA, Fitted.mean = 10 * fitted$mean, Fitted.sd = 10 * fitted$sd) %>%
+  gather(variable, value, -Year, -Id) %>%
+  extract(variable, c("Variable", "Type"), "(.+)\\.(.+)") %>%
+  spread(Type, value) %>%
+  rowwise() %>% dplyr::mutate(ymin = max(mean - sd, 0), ymax = mean + sd)
+compare %>% #filter(Id %in% sample(Id, 6, replace = F)) %>%
+  filter(Id %in% c(94,735,1191,1291,1403,1735)) %>%
+  ggplot() + geom_line(aes(Year, mean, color = Variable)) + 
+  geom_errorbar(aes(Year, ymin = ymin, ymax = ymax, colour = Variable)) +
+  facet_wrap(~ Id) + ylab("Count / km") + guides(colour = guide_legend(title = NULL))
+```
+
+&nbsp;
+
+```{r observed-fitted-counts, cache=TRUE, include=TRUE, fig.width=6.535433, fig.height=3.267717, fig.cap="Figure 5: Mean observed and mean fitted survey counts of red squirrel aggregated over census sites. Error bars indicate estimated standard deviations."}
+fitted <- model1$getResult()$summary.fitted.values[model1$getIndex("obs"),]
+compare <- data.frame(Year = time(oravat), province = oravat$Province, observed = oravat$density, fitted.mean = fitted$mean, fitted.var = fitted$sd^2) %>%
+  group_by(Year) %>%
+  summarise(Observed.mean = mean(observed), Observed.sd = NA, Fitted.mean = mean(10 * fitted.mean),
+            Fitted.sd = sqrt(sum(10^2 * fitted.var) / (n() - 1))) %>%
+  gather(variable, value, -Year) %>%
+  extract(variable, c("Variable", "Type"), "(.+)\\.(.+)") %>%
+  spread(Type, value) %>%
+  rowwise() %>% dplyr::mutate(ymin = max(mean - sd, 0), ymax = mean + sd) %>%
+  dplyr::arrange(desc(Variable))
+compare %>% ggplot() + geom_line(aes(Year, mean, colour = Variable)) +
+  geom_errorbar(aes(Year, ymin = ymin, ymax = ymax, colour = Variable)) +
+  xlab("Year") + ylab(expression(Count / km)) + guides(colour = guide_legend(title = NULL))
+```
+
+&nbsp;
+
+```{r fitted-dist, cache=TRUE, include=TRUE, message=FALSE, echo=FALSE,  fig.width=6.535433, fig.asp=1, fig.cap="Figure 6: Estimated spatio-temporal distributions of red squirrel in Finland between 1991-2013 in odd years."}
+library(gstat)
+library(rgeos)
+
+finland <- getData(country = "FI", level = 0) %>% spTransform(CRS("+init=epsg:2393")) %>% gSimplify(2000)
+finland.tidy <- broom::tidy(finland)
+
+ip <- function(x, ext, template) {
+  y <- x %>% as.data.frame %>% `coordinates<-`(~X+Y)
+  mg <- gstat(id = "density", formula = fitted~1, data = y , nmax = 10, set = list(idp = .5))
+  r <- raster(ext, nrows = 400, ncols = 200)
+  z <- interpolate(r, mg)
+  mask(z, template)
+}
+
+fitted <- model1$getFittedResponse(variable = "mean", tag = "obs") * 10
+ext <- extend(extent(model1$getSpatialMesh()$getKnots()), 10000)
+x <- oravat %>% as.data.frame %>% mutate(fitted = fitted) %>% split(.$time) %>% map(ip, ext = ext, template = finland) %>% stack()
+maxTimeIndex <- oravat %>% time %>% unique %>% length
+plotLayers <- x[[seq(1, maxTimeIndex, 2)]]
+labeller <- as_labeller(function(x) substr(x, 5, 8))
+plotLayers %>% gplot() + geom_tile(aes(fill = value)) +
+  geom_path(data = finland.tidy, aes(long, lat, group = group), colour = "grey") +
+  facet_wrap(~ variable, labeller = labeller) +
+  scale_fill_gradient(low = 'white', high = 'blue', na.value = NA) +
+  coord_equal() +
+  theme_raster() +
+  theme(legend.position = "bottom") +
+  guides(fill = guide_legend(title = expression(paste("Density ", km^{-1}))))
+```
+
+&nbsp;
+
+```{r spatial-residuals, cache=TRUE, include=TRUE, fig.width=6.535433, fig.height=3.267717, fig.cap="Figure 7: Spatial residuals in year 2000 of the best fit spatio-temporal model. Residuals in other years follow similar pattern."}
+finland <- getData(country = "FI", level = 0) %>% spTransform(CRS("+init=epsg:2393")) %>% gSimplify(2000)
+finland.tidy <- broom::tidy(finland)
+s <- model1$getFittedSpatialEffect()$mean
+meshNodes <- model1$getSpatialMesh()$getINLAMesh()$n
+maxTimeIndex <- length(na.omit(unique(INLA::inla.stack.data(model1$getFullStack())$spatial.group)))
+predictions <- INLA::inla.vector2matrix(s, nrow = meshNodes, ncol = maxTimeIndex)
+r <- SpaceTimeModels::SpaceTimeRaster$new(x = raster::extend(raster::extent(finland), 10), height = 1200, width = 600, crs = finland@proj4string)
+x <- r$project(model1$getSpatialMesh(), predictions)
+#plotLayers <- x$getLayers()[[seq(1, maxTimeIndex, 2)]]
+plotLayers <- x$getLayer(9)
+m <- mask(plotLayers, finland)
+
+m %>% rasterVis::gplot() + ggplot2::geom_raster(aes(fill = value)) +
+  geom_path(data = finland.tidy, aes(long, lat, group = group), colour = "grey") +
+  #facet_wrap(~ variable) +
+  scale_fill_gradient2(low = 'red', mid = 'white', high = 'blue', na.value = NA) +
+  ggplot2::coord_equal() +
+  theme_raster() +
+  theme(legend.position = "right") +
+  guides(fill = guide_legend(title = "Spatial\nresidual"))
+```
